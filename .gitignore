@@ -1,0 +1,15 @@
+# Config
+.env
+# Compiled binaries
+*.exe
+*.bin
+*/bin/
+
+# Go module cache
+/pkg/
+/go.mod.bak
+/go.sum.bak
+
+# Editor/IDE specific files (examples)
+.idea/
+.vscode/
