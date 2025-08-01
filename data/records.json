@@ -1,0 +1,26 @@
+{
+  "big bog": {
+    "user": "big Bog",
+    "reason": "lame"
+  },
+  "bo bo bo": {
+    "user": "bo bo bo",
+    "reason": "something"
+  },
+  "da taco #123": {
+    "user": "da taco #123",
+    "reason": "bad at something"
+  },
+  "shify": {
+    "user": "shify",
+    "reason": "test"
+  },
+  "testing testing": {
+    "user": "testing testing",
+    "reason": "carrots"
+  },
+  "whale": {
+    "user": "whale",
+    "reason": "kale"
+  }
+}

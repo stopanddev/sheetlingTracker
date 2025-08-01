@@ -61,7 +61,7 @@ func main() {
 		panic(err)
 	}
 	defer dg.Close()
-	//clearCommands(dg, guildID)
+	clearCommands(dg, guildID)
 	// Register commands
 	registerCommands(dg, guildID)
 
@@ -158,7 +158,7 @@ func handleUpdate(s *discordgo.Session, i *discordgo.InteractionCreate, channelI
 	}
 
 	count := len(updatedUsers)
-
+	fmt.Println("161")
 	if count > 0 {
 		err = saveRecords(records)
 		if err != nil {
@@ -173,7 +173,6 @@ func handleUpdate(s *discordgo.Session, i *discordgo.InteractionCreate, channelI
 }
 
 func handleFind(s *discordgo.Session, i *discordgo.InteractionCreate, query string) {
-	fmt.Println("WE ARE HERE")
 	records, err := loadRecords()
 	if err != nil || len(records) == 0 {
 		respond(s, i, "No records found.")
@@ -182,17 +181,19 @@ func handleFind(s *discordgo.Session, i *discordgo.InteractionCreate, query stri
 
 	var usernames []string
 	for k := range records {
-		usernames = append(usernames, k)
+		usernames = append(usernames, strings.ToLower(k))
 	}
 
 	matches := fuzzy.Find(strings.ToLower(query), usernames)
+	fmt.Println(matches)
 	if len(matches) == 0 {
-		respond(s, i, "No close matches.")
+		respond(s, i, "Ther are no close matches.")
 		return
 	}
 
 	resp := "**Closest matches:**\n"
 	for i, match := range matches {
+		fmt.Println(i)
 		if i >= 3 {
 			break
 		}
@@ -220,6 +221,8 @@ func extractUserReason(content string) (string, string) {
 }
 
 func respond(s *discordgo.Session, i *discordgo.InteractionCreate, msg string) {
+	fmt.Println("In Respond")
+	fmt.Println(msg)
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
