@@ -82,7 +82,6 @@ func HandleLoLCommands(s *discordgo.Session, i *discordgo.InteractionCreate, rio
 }
 
 func handleLoLStatus(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	fmt.Println("I AM HERE")
 	start := time.Now()
 	fmt.Println("[DEBUG] /lolstatus called with region: NA1")
 
@@ -102,7 +101,7 @@ func handleLoLStatus(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		return
 	}
 
-	url := fmt.Sprintf("https://na1.api.riotgames.com/lol/status/v4/platform-data")
+	url := "https://na1.api.riotgames.com/lol/status/v4/platform-data"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		respond(s, i, "Failed to create request.")
@@ -210,7 +209,6 @@ func handleSummonerLookup(s *discordgo.Session, i *discordgo.InteractionCreate, 
 	err = json.NewDecoder(resp.Body).Decode(&summoner)
 	if err != nil {
 		respond(s, i, "Failed to decode summoner data.")
-		fmt.Println(resp.Body)
 		return Summoner{}, err
 	}
 
@@ -224,15 +222,12 @@ func handleMatchHistory(s *discordgo.Session, i *discordgo.InteractionCreate, na
 	if err != nil {
 		respond(s, i, "Failed to find player 1")
 	}
-	fmt.Println("Found Plyaer 1")
 	player2, err := handleSummonerLookup(s, i, name2, riotApiKey)
 	if err != nil {
 		respond(s, i, "Failed to find player 1")
 	}
 
-	fmt.Println("Found Plyaer 2")
 	player1_matches, err := handleFindMatches(s, i, player1.Puuid, riotApiKey)
-	fmt.Println(player1_matches)
 	if err != nil {
 		respond(s, i, "Player 1 has no matches")
 	}
@@ -242,7 +237,6 @@ func handleMatchHistory(s *discordgo.Session, i *discordgo.InteractionCreate, na
 		respond(s, i, "Player 2 has no matches")
 	}
 
-	fmt.Println(player2_matches)
 	common_matches := FindCommonMatches(player1_matches, player2_matches)
 	if err != nil {
 		respond(s, i, "Comparing matches failed")
@@ -252,36 +246,21 @@ func handleMatchHistory(s *discordgo.Session, i *discordgo.InteractionCreate, na
 		msg := "No matches played together"
 		respond(s, i, msg)
 	} else {
-		fmt.Printf("WE IN THE ELSE")
 		for _, id := range common_matches {
-			fmt.Printf("Match ID %s", id)
-			temp_match_info, err := handleFindMatcheInfo(s, i, id, riotApiKey)
+			temp_match_info, err := handleFindMatchInfo(s, i, id, riotApiKey)
 			if err != nil {
-				respond(s, i, "Error getting match info")
+				fmt.Println("Error getting match info")
 			}
 			match_info = append(match_info, temp_match_info)
 		}
 	}
-
-	for i, match := range match_info {
-		fmt.Printf("Match #%d\n", i+1)
-		fmt.Printf("Match ID: %s\n", match.Metadata.MatchID)
-		fmt.Printf("Game Mode: %s\n", match.Info.GameMode)
-		fmt.Printf("Game Duration: %d seconds\n", match.Info.GameDuration)
-		fmt.Println("Participants:")
-
-		for _, p := range match.Info.Participants {
-			fmt.Printf(" - %s (%s): %d Kills, %d Deaths, %d Assists\n",
-				p.SummonerName, p.ChampionName, p.Kills, p.Deaths, p.Assists)
-		}
-
-		fmt.Println(strings.Repeat("-", 40))
-	}
+	total, victories := countVictories(match_info, player1.Puuid)
+	msg := fmt.Sprintf("%s and %s have won **%d** out of **%d** games played together", player1.GameName, player2.GameName, victories, total)
+	respond(s, i, msg)
 }
 
 func handleFindMatches(s *discordgo.Session, i *discordgo.InteractionCreate, puuid string, riotApiKey string) ([]string, error) {
-	fmt.Printf("THE PUUID %s", puuid)
-	url := fmt.Sprintf("https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/%s", puuid)
+	url := fmt.Sprintf("https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/%s/ids?start=0&count=30", puuid)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		respond(s, i, "Failed to create request.")
@@ -298,17 +277,21 @@ func handleFindMatches(s *discordgo.Session, i *discordgo.InteractionCreate, puu
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 404 {
-		respond(s, i, "Match not found.")
+		fmt.Println("Match not found.")
+		fmt.Println(resp.Body)
 		return nil, err
 	}
+
 	if resp.StatusCode != 200 {
-		respond(s, i, fmt.Sprintf("Riot API error: %d", resp.StatusCode))
+		fmt.Printf("Riot API error: %d", resp.StatusCode)
 		return nil, err
 	}
+
 	var matches []string
 	err = json.NewDecoder(resp.Body).Decode(&matches)
 	if err != nil {
 		respond(s, i, "Failed to decode summoner data.")
+		fmt.Println("ERROR DECODE")
 		fmt.Println(resp.Body)
 		return nil, err
 	}
@@ -316,7 +299,7 @@ func handleFindMatches(s *discordgo.Session, i *discordgo.InteractionCreate, puu
 	return matches, err
 }
 
-func handleFindMatcheInfo(s *discordgo.Session, i *discordgo.InteractionCreate, matchID string, riotApiKey string) (MatchDto, error) {
+func handleFindMatchInfo(s *discordgo.Session, i *discordgo.InteractionCreate, matchID string, riotApiKey string) (MatchDto, error) {
 
 	url := fmt.Sprintf("https://americas.api.riotgames.com/lol/match/v5/matches/%s", matchID)
 	req, err := http.NewRequest("GET", url, nil)
@@ -335,7 +318,7 @@ func handleFindMatcheInfo(s *discordgo.Session, i *discordgo.InteractionCreate, 
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 404 {
-		respond(s, i, fmt.Sprintf("Match not found."))
+		respond(s, i, "Match not found.")
 		return MatchDto{}, err
 	}
 	if resp.StatusCode != 200 {
@@ -372,19 +355,30 @@ func editResponse(s *discordgo.Session, i *discordgo.InteractionCreate, msg stri
 }
 
 func FindCommonMatches(a, b []string) []string {
-	fmt.Printf("-----------")
 	matchSet := make(map[string]struct{})
 	for _, id := range a {
-		fmt.Printf("%s", id)
 		matchSet[id] = struct{}{}
 	}
 
 	var common []string
 	for _, id := range b {
-		fmt.Printf("%s", id)
 		if _, exists := matchSet[id]; exists {
 			common = append(common, id)
 		}
 	}
 	return common
+}
+
+func countVictories(matches []MatchDto, puuid string) (total int, victories int) {
+	for _, match := range matches {
+		total = total + 1
+
+		for _, participant := range match.Info.Participants {
+			if participant.Puuid == puuid && participant.Win {
+				victories = victories + 1
+				break
+			}
+		}
+	}
+	return total, victories
 }
