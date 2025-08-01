@@ -113,7 +113,7 @@ func handleInteraction(s *discordgo.Session, i *discordgo.InteractionCreate, wat
 	case "find":
 		query := i.ApplicationCommandData().Options[0].StringValue()
 		handleFind(s, i, query)
-	case "lol-status", "summoner", "duo-history":
+	case "lol-status", "summoner", "duo-history", "find-censored":
 		lol.HandleLoLCommands(s, i, riotApiKey)
 	default:
 		fmt.Printf("[DEBUG] Unknown command: %s\n", i.ApplicationCommandData().Name)

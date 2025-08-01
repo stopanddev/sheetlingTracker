@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/sahilm/fuzzy"
 )
 
 // RegisterLoLCommands registers LoL-related slash commands
@@ -63,6 +64,28 @@ func RegisterLoLCommands(s *discordgo.Session, guildID string) error {
 		return err
 	}
 
+	// Find censored user in your game
+	_, err = s.ApplicationCommandCreate(s.State.User.ID, guildID, &discordgo.ApplicationCommand{
+		Name:        "find-censored",
+		Description: "Lookup summoner info by name",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "your-name",
+				Description: "Summoner name",
+				Required:    true,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "their-name",
+				Description: "Summoner name",
+				Required:    true,
+			},
+		},
+	})
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -78,6 +101,10 @@ func HandleLoLCommands(s *discordgo.Session, i *discordgo.InteractionCreate, rio
 		name1 := i.ApplicationCommandData().Options[0].StringValue()
 		name2 := i.ApplicationCommandData().Options[1].StringValue()
 		handleMatchHistory(s, i, name1, name2, riotApiKey)
+	case "find-censored":
+		yourname := i.ApplicationCommandData().Options[0].StringValue()
+		theirname := i.ApplicationCommandData().Options[1].StringValue()
+		handleFindCensored(s, i, theirname, riotApiKey, yourname)
 	}
 }
 
@@ -334,6 +361,54 @@ func handleFindMatchInfo(s *discordgo.Session, i *discordgo.InteractionCreate, m
 	}
 
 	return match_info, err
+}
+
+func handleFindCensored(s *discordgo.Session, i *discordgo.InteractionCreate, search string, riotApiKey string, name string) {
+	user, err := handleSummonerLookup(s, i, name, riotApiKey)
+	if err != nil {
+		fmt.Println("Can't find user in handleFindCensored")
+	}
+
+	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+	})
+	some_matches, err := handleFindMatches(s, i, user.Puuid, riotApiKey)
+	if err != nil {
+		fmt.Println("handleFindMatches in handleFindCensored errored out")
+	}
+	var usernames []string
+	usernameSet := make(map[string]struct{})
+
+	for _, match := range some_matches {
+		curr_match, err := handleFindMatchInfo(s, i, match, riotApiKey)
+		if err != nil {
+			fmt.Println("handleFindMatchInfo in handleFindCensored errored")
+		}
+
+		for _, p := range curr_match.Info.Participants {
+			name := strings.ToLower(p.RiotIdGameName)
+			if _, exists := usernameSet[name]; !exists {
+				usernameSet[name] = struct{}{}
+				usernames = append(usernames, name)
+			}
+		}
+	}
+	matches := fuzzy.Find(strings.ToLower(search), usernames)
+	if len(matches) == 0 {
+		respond(s, i, "No close matches.")
+		return
+	}
+
+	resp := "**Closest matches:**\n"
+	for i, match := range matches {
+		if i >= 9 {
+			break
+		}
+		resp += fmt.Sprintf("• User: **%s**\n", match.Str)
+	}
+
+	editResponse(s, i, resp)
+
 }
 
 func respond(s *discordgo.Session, i *discordgo.InteractionCreate, msg string) {
