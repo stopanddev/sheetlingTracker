@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sheetlingTracker/lol"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
@@ -36,6 +37,15 @@ func main() {
 		panic("WATCH_CHANNEL_ID not set")
 	}
 
+	guildID := os.Getenv("DISCORD_GUILD_ID")
+	if watchChannelID == "" {
+		panic("GUID_ID NOT SET")
+	}
+
+	riotApiKey := os.Getenv("RIOT_API_KEY")
+	if riotApiKey == "" {
+		panic("RIOT_API_KEY NOT SET")
+	}
 	dg, err := discordgo.New("Bot " + token)
 	if err != nil {
 		panic(err)
@@ -43,7 +53,7 @@ func main() {
 
 	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsMessageContent
 	dg.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		handleInteraction(s, i, watchChannelID)
+		handleInteraction(s, i, watchChannelID, riotApiKey)
 	})
 
 	err = dg.Open()
@@ -51,16 +61,16 @@ func main() {
 		panic(err)
 	}
 	defer dg.Close()
-
+	//clearCommands(dg, guildID)
 	// Register commands
-	registerCommands(dg)
+	registerCommands(dg, guildID)
 
 	fmt.Println("Bot is running. Press CTRL-C to exit.")
 	select {}
 }
 
-func registerCommands(s *discordgo.Session) {
-	_, err := s.ApplicationCommandCreate(s.State.User.ID, "", &discordgo.ApplicationCommand{
+func registerCommands(s *discordgo.Session, guildID string) {
+	_, err := s.ApplicationCommandCreate(s.State.User.ID, guildID, &discordgo.ApplicationCommand{
 		Name:        "update",
 		Description: "Scan channel and update user records",
 	})
@@ -68,7 +78,7 @@ func registerCommands(s *discordgo.Session) {
 		panic(err)
 	}
 
-	_, err = s.ApplicationCommandCreate(s.State.User.ID, "", &discordgo.ApplicationCommand{
+	_, err = s.ApplicationCommandCreate(s.State.User.ID, guildID, &discordgo.ApplicationCommand{
 		Name:        "find",
 		Description: "Find a user in the records",
 		Options: []*discordgo.ApplicationCommandOption{
@@ -83,15 +93,30 @@ func registerCommands(s *discordgo.Session) {
 	if err != nil {
 		panic(err)
 	}
+
+	err = lol.RegisterLoLCommands(s, guildID)
+	if err != nil {
+		panic(err)
+	}
 }
 
-func handleInteraction(s *discordgo.Session, i *discordgo.InteractionCreate, watchChannelID string) {
+func handleInteraction(s *discordgo.Session, i *discordgo.InteractionCreate, watchChannelID string, riotApiKey string) {
+	if i.Type != discordgo.InteractionApplicationCommand {
+		return // Ignore non-command interactions
+	}
+
+	fmt.Printf("[DEBUG] Handling interaction: %s\n", i.ApplicationCommandData().Name)
+
 	switch i.ApplicationCommandData().Name {
 	case "update":
 		handleUpdate(s, i, watchChannelID)
 	case "find":
 		query := i.ApplicationCommandData().Options[0].StringValue()
 		handleFind(s, i, query)
+	case "lol-status", "summoner", "duo-history":
+		lol.HandleLoLCommands(s, i, riotApiKey)
+	default:
+		fmt.Printf("[DEBUG] Unknown command: %s\n", i.ApplicationCommandData().Name)
 	}
 }
 
@@ -148,6 +173,7 @@ func handleUpdate(s *discordgo.Session, i *discordgo.InteractionCreate, channelI
 }
 
 func handleFind(s *discordgo.Session, i *discordgo.InteractionCreate, query string) {
+	fmt.Println("WE ARE HERE")
 	records, err := loadRecords()
 	if err != nil || len(records) == 0 {
 		respond(s, i, "No records found.")
@@ -248,4 +274,20 @@ func saveLastMessageID(id string) {
 	}
 	_ = os.MkdirAll(dataDir, 0755)
 	_ = os.WriteFile(lastMsgFile, data, 0644)
+}
+
+func clearCommands(s *discordgo.Session, guildID string) {
+	cmds, err := s.ApplicationCommands(s.State.User.ID, guildID)
+	if err != nil {
+		fmt.Println("Failed to fetch commands:", err)
+		return
+	}
+	for _, cmd := range cmds {
+		err := s.ApplicationCommandDelete(s.State.User.ID, guildID, cmd.ID)
+		if err != nil {
+			fmt.Printf("Failed to delete command %s: %v\n", cmd.Name, err)
+		} else {
+			fmt.Println("Deleted command:", cmd.Name)
+		}
+	}
 }
