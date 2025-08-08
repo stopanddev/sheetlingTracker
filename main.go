@@ -94,6 +94,22 @@ func registerCommands(s *discordgo.Session, guildID string) {
 		panic(err)
 	}
 
+	_, err = s.ApplicationCommandCreate(s.State.User.ID, guildID, &discordgo.ApplicationCommand{
+		Name:        "delete-user",
+		Description: "Delete a user in the records",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "query",
+				Description: "Username to delete",
+				Required:    true,
+			},
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
+
 	err = lol.RegisterLoLCommands(s, guildID)
 	if err != nil {
 		panic(err)
@@ -113,6 +129,9 @@ func handleInteraction(s *discordgo.Session, i *discordgo.InteractionCreate, wat
 	case "find":
 		query := i.ApplicationCommandData().Options[0].StringValue()
 		handleFind(s, i, query)
+	case "delete-user":
+		query := i.ApplicationCommandData().Options[0].StringValue()
+		handleDeleteUserRecord(s, i, query)
 	case "lol-status", "summoner", "duo-history", "find-censored":
 		lol.HandleLoLCommands(s, i, riotApiKey)
 	default:
@@ -293,4 +312,36 @@ func clearCommands(s *discordgo.Session, guildID string) {
 			fmt.Println("Deleted command:", cmd.Name)
 		}
 	}
+}
+
+func handleDeleteUserRecord(s *discordgo.Session, i *discordgo.InteractionCreate, username string) error {
+	records, err := loadRecords()
+	if err != nil {
+		return err
+	}
+
+	lowerUser := strings.ToLower(username)
+
+	// Check if user exists and delete if found
+	if _, exists := records[lowerUser]; exists {
+		delete(records, lowerUser)
+	} else {
+		msg := fmt.Sprintf("user %s not found in records", username)
+		handleFind(s, i, username)
+		respond(s, i, msg)
+	}
+
+	data, err := json.MarshalIndent(records, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	err = os.MkdirAll(dataDir, 0755)
+	if err != nil {
+		return err
+	}
+
+	msg := fmt.Sprintf("user: %s removed from shit list", username)
+	respond(s, i, msg)
+	return os.WriteFile(recordsFile, data, 0644)
 }
