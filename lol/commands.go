@@ -238,7 +238,7 @@ func handleSummonerLookup(s *discordgo.Session, i *discordgo.InteractionCreate, 
 		respond(s, i, "Failed to decode summoner data.")
 		return Summoner{}, err
 	}
-
+	fmt.Println(summoner)
 	return summoner, err
 }
 
