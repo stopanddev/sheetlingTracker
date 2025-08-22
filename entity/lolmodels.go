@@ -1,4 +1,4 @@
-package lol
+package entity
 
 type Summoner struct {
 	Puuid    string `json:"puuid"`
