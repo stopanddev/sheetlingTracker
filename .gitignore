@@ -13,3 +13,6 @@
 # Editor/IDE specific files (examples)
 .idea/
 .vscode/
+
+data/*
+!data/.gitkeep

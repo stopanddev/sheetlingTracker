@@ -17,18 +17,16 @@ var RecordsFile = DataDir + "/records.json"
 var LastMsgFile = DataDir + "/last_message.json"
 var TrackedUserFile = DataDir + "/tracked_users.json"
 
-func updateSheetlings(s *discordgo.Session, i *discordgo.InteractionCreate, channelID string) string {
+func updateSheetlings(s *discordgo.Session, channelID string) string {
 	records, err := loadRecords()
 	if err != nil {
-		utils.Respond(s, i, "Failed to load records.")
-		return
+		return "Failed to load records."
 	}
 
 	lastID := loadLastMessageID()
 	messages, err := s.ChannelMessages(channelID, 100, "", "", lastID)
 	if err != nil {
-		utils.Respond(s, i, "Failed to fetch messages.")
-		return
+		return "Failed to fetch messages."
 	}
 
 	newestID := lastID
@@ -58,21 +56,19 @@ func updateSheetlings(s *discordgo.Session, i *discordgo.InteractionCreate, chan
 	if count > 0 {
 		err = saveRecords(records)
 		if err != nil {
-			utils.Respond(s, i, "Failed to save records.")
-			return
+			return "Failed to save records."
 		}
 		saveLastMessageID(newestID)
-		utils.Respond(s, i, fmt.Sprintf("Updated records with %d new entries.", count))
+		return fmt.Sprintf("Updated records with %d new entries.", count)
 	} else {
-		utils.Respond(s, i, "No new records found.")
+		return "No new records found."
 	}
 }
 
-func handleFind(s *discordgo.Session, i *discordgo.InteractionCreate, query string) {
+func findCensoredName(s *discordgo.Session, i *discordgo.InteractionCreate, query string) string {
 	records, err := loadRecords()
 	if err != nil {
-		utils.Respond(s, i, "Filed to load tracked players.")
-		return
+		return "Filed to load tracked players."
 	}
 
 	var usernames []string
@@ -83,8 +79,7 @@ func handleFind(s *discordgo.Session, i *discordgo.InteractionCreate, query stri
 	matches := fuzzy.Find(strings.ToLower(query), usernames)
 	fmt.Println(matches)
 	if len(matches) == 0 {
-		utils.Respond(s, i, "Ther are no close matches.")
-		return
+		return "Ther are no close matches."
 	}
 
 	resp := "**Closest matches:**\n"
@@ -97,14 +92,13 @@ func handleFind(s *discordgo.Session, i *discordgo.InteractionCreate, query stri
 		resp += fmt.Sprintf("• User: **%s**  Offense: **%s**\n", rec.User, rec.Reason)
 	}
 
-	utils.Respond(s, i, resp)
+	return resp
 }
 
-func handleAddTrackedUser(s *discordgo.Session, i *discordgo.InteractionCreate, query string) {
+func addTrackedUser(s *discordgo.Session, i *discordgo.InteractionCreate, query string) string {
 	records, err := loadTrackedPlayers()
 	if err != nil {
-		utils.Respond(s, i, "Fialed to get or create tracked players file.")
-		return
+		return "Failed to get or create tracked players file."
 	}
 	exists := false
 	for _, record := range records {
@@ -114,16 +108,16 @@ func handleAddTrackedUser(s *discordgo.Session, i *discordgo.InteractionCreate, 
 	}
 
 	if exists {
-		return
+		return "User already followed"
 	}
 	lowerQuery := strings.ToLower(query)
 	records[lowerQuery] = entity.User{User: lowerQuery}
 	err = saveTrackedUser(records)
 	if err != nil {
-		utils.Respond(s, i, "Failed To Add Player")
+		return "Failed To Add Player"
 	}
 
-	utils.Respond(s, i, "User Added")
+	return "User Added"
 }
 
 // Utility functions
@@ -231,7 +225,7 @@ func clearCommands(s *discordgo.Session, guildID string) {
 	}
 }
 
-func handleDeleteUserRecord(s *discordgo.Session, i *discordgo.InteractionCreate, username string) error {
+func deleteSheetUser(s *discordgo.Session, i *discordgo.InteractionCreate, username string) error {
 	records, err := loadRecords()
 	if err != nil {
 		return err
@@ -244,7 +238,7 @@ func handleDeleteUserRecord(s *discordgo.Session, i *discordgo.InteractionCreate
 		delete(records, lowerUser)
 	} else {
 		msg := fmt.Sprintf("user %s not found in records", username)
-		handleFind(s, i, username)
+		findCensoredName(s, i, username)
 		utils.Respond(s, i, msg)
 	}
 
@@ -263,7 +257,7 @@ func handleDeleteUserRecord(s *discordgo.Session, i *discordgo.InteractionCreate
 	return os.WriteFile(RecordsFile, data, 0644)
 }
 
-func handleDeleteTrackedUserRecord(s *discordgo.Session, i *discordgo.InteractionCreate, username string) error {
+func deleteTrackedUserRecord(s *discordgo.Session, i *discordgo.InteractionCreate, username string) error {
 	records, err := loadTrackedPlayers()
 	if err != nil {
 		return err
@@ -276,7 +270,7 @@ func handleDeleteTrackedUserRecord(s *discordgo.Session, i *discordgo.Interactio
 		delete(records, lowerUser)
 	} else {
 		msg := fmt.Sprintf("user %s not found in records", username)
-		handleFind(s, i, username)
+		findCensoredName(s, i, username)
 		utils.Respond(s, i, msg)
 	}
 

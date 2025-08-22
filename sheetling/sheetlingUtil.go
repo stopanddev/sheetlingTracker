@@ -91,15 +91,15 @@ func HandleSheetlingCommands(s *discordgo.Session, i *discordgo.InteractionCreat
 		handleUpdateSheetlings(s, i, watchChannelID)
 	case "find":
 		query := i.ApplicationCommandData().Options[0].StringValue()
-		handleFind(s, i, query)
+		handleFindCensoredNames(s, i, query)
 	case "track-user":
 		query := i.ApplicationCommandData().Options[0].StringValue()
 		handleAddTrackedUser(s, i, query)
 	case "delete-user":
 		query := i.ApplicationCommandData().Options[0].StringValue()
-		handleDeleteUserRecord(s, i, query)
+		handleDeleteSheetUser(s, i, query)
 	case "delete-tracked-user":
 		query := i.ApplicationCommandData().Options[0].StringValue()
-		handleDeleteTrackedUserRecord(s, i, query)
+		handleDeleteTrackedUser(s, i, query)
 	}
 }
