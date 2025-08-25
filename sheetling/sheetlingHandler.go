@@ -7,16 +7,19 @@ import (
 )
 
 func handleUpdateSheetlings(s *discordgo.Session, i *discordgo.InteractionCreate, channelID string) {
+	utils.Respond(s, i)
 	msg := updateSheetlings(s, channelID)
 	utils.EditResponse(s, i, msg)
 }
 
 func handleFindSheetling(s *discordgo.Session, i *discordgo.InteractionCreate, query string) {
+	utils.Respond(s, i)
 	msg := findSheetling(query)
 	utils.EditResponse(s, i, msg)
 }
 
 func handleAddTrackedUser(s *discordgo.Session, i *discordgo.InteractionCreate, query string) {
+	utils.Respond(s, i)
 	msg := addTrackedUser(s, i, query)
 	utils.EditResponse(s, i, msg)
 }

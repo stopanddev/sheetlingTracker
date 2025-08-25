@@ -19,9 +19,8 @@ var LastMsgFile = DataDir + "/last_message.json"
 var TrackedUserFile = DataDir + "/tracked_users.json"
 
 func updateSheetlings(s *discordgo.Session, channelId string) string {
-	fmt.Println("Top of update sheet")
+
 	lastId := loadLastSheetlingMessageId(channelId)
-	fmt.Println(lastId)
 	messages, err := s.ChannelMessages(channelId, 100, "", lastId, "")
 	if err != nil {
 		return "Failed to fetch messages."
@@ -75,14 +74,14 @@ func findSheetling(query string) string {
 	rows, err := db.Conn.Query(context.Background(), `
 		(
 			SELECT name, reason
-			FROM sheetling
+			FROM sheetlings
 			WHERE name = $1
 			LIMIT 1
 		)
 		UNION ALL
 		(
 			SELECT name, reason
-			FROM sheetling
+			FROM sheetlings
 			WHERE name ILIKE '%' || $1 || '%'
 			  AND name <> $1
 			LIMIT 2
@@ -93,7 +92,6 @@ func findSheetling(query string) string {
 		return fmt.Sprintf("Error searching sheetlings: %v", err)
 	}
 	defer rows.Close()
-
 	var results []string
 	for rows.Next() {
 		var name, reason string
