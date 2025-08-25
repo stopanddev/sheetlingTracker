@@ -1,14 +1,14 @@
 package entity
 
 type UserRecord struct {
-	User   string `json:"user"`
-	Reason string `json:"reason"`
+	User   string
+	Reason string
 }
 
 type User struct {
-	User string `jsong:"user"`
+	User string
 }
 
 type Tracker struct {
-	LastMessageID string `json:"last_message_id"`
+	LastMessageID string
 }

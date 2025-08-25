@@ -1,15 +1,16 @@
 package sheetling
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
+	"sheetlingTracker/db"
 	"sheetlingTracker/entity"
-	utils "sheetlingTracker/util"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/sahilm/fuzzy"
+	"github.com/jackc/pgx/v4"
 )
 
 var DataDir = "data"
@@ -17,20 +18,17 @@ var RecordsFile = DataDir + "/records.json"
 var LastMsgFile = DataDir + "/last_message.json"
 var TrackedUserFile = DataDir + "/tracked_users.json"
 
-func updateSheetlings(s *discordgo.Session, channelID string) string {
-	records, err := loadRecords()
-	if err != nil {
-		return "Failed to load records."
-	}
-
-	lastID := loadLastMessageID()
-	messages, err := s.ChannelMessages(channelID, 100, "", "", lastID)
+func updateSheetlings(s *discordgo.Session, channelId string) string {
+	fmt.Println("Top of update sheet")
+	lastId := loadLastSheetlingMessageId(channelId)
+	fmt.Println(lastId)
+	messages, err := s.ChannelMessages(channelId, 100, "", lastId, "")
 	if err != nil {
 		return "Failed to fetch messages."
 	}
 
-	newestID := lastID
-	updatedUsers := make(map[string]bool)
+	newestId := lastId
+	records := make(map[string]entity.UserRecord)
 	for _, msg := range messages {
 		if msg.Author.Bot {
 			continue
@@ -41,58 +39,75 @@ func updateSheetlings(s *discordgo.Session, channelID string) string {
 		}
 
 		lowerUser := strings.ToLower(user)
-		oldRec, exists := records[lowerUser]
-		if !exists || oldRec.Reason != reason {
-			records[lowerUser] = entity.UserRecord{User: user, Reason: reason}
-			updatedUsers[lowerUser] = true
-		}
-
-		if msg.ID > newestID {
-			newestID = msg.ID
+		records[lowerUser] = entity.UserRecord{User: user, Reason: reason}
+		if msg.ID > newestId {
+			newestId = msg.ID
 		}
 	}
 
-	count := len(updatedUsers)
+	count := len(records)
 	if count > 0 {
-		err = saveRecords(records)
-		if err != nil {
-			return "Failed to save records."
+		batch := &pgx.Batch{}
+
+		for _, record := range records {
+			fmt.Println(record.User, record.Reason)
+			batch.Queue("INSERT INTO sheetlings (name, reason) VALUES ($1, $2)", record.User, record.Reason)
 		}
-		saveLastMessageID(newestID)
+		batchRequest := db.Conn.SendBatch(context.Background(), batch)
+		defer batchRequest.Close()
+
+		for range records {
+			if _, err := batchRequest.Exec(); err != nil {
+				return "Error inserting shitling update"
+			}
+		}
+		result := saveLastMessageId(newestId, channelId)
+		if result != "" {
+			return result
+		}
 		return fmt.Sprintf("Updated records with %d new entries.", count)
 	} else {
 		return "No new records found."
 	}
 }
 
-func findCensoredName(s *discordgo.Session, i *discordgo.InteractionCreate, query string) string {
-	records, err := loadRecords()
+func findSheetling(query string) string {
+	rows, err := db.Conn.Query(context.Background(), `
+		(
+			SELECT name, reason
+			FROM sheetling
+			WHERE name = $1
+			LIMIT 1
+		)
+		UNION ALL
+		(
+			SELECT name, reason
+			FROM sheetling
+			WHERE name ILIKE '%' || $1 || '%'
+			  AND name <> $1
+			LIMIT 2
+		)
+	`, query)
+
 	if err != nil {
-		return "Filed to load tracked players."
+		return fmt.Sprintf("Error searching sheetlings: %v", err)
 	}
+	defer rows.Close()
 
-	var usernames []string
-	for k := range records {
-		usernames = append(usernames, strings.ToLower(k))
-	}
-
-	matches := fuzzy.Find(strings.ToLower(query), usernames)
-	fmt.Println(matches)
-	if len(matches) == 0 {
-		return "Ther are no close matches."
-	}
-
-	resp := "**Closest matches:**\n"
-	for i, match := range matches {
-		fmt.Println(i)
-		if i >= 3 {
-			break
+	var results []string
+	for rows.Next() {
+		var name, reason string
+		if err := rows.Scan(&name, &reason); err != nil {
+			return fmt.Sprintf("Error reading result: %v", err)
 		}
-		rec := records[match.Str]
-		resp += fmt.Sprintf("• User: **%s**  Offense: **%s**\n", rec.User, rec.Reason)
+		results = append(results, fmt.Sprintf("User: %s\nReason: %s", name, reason))
 	}
 
-	return resp
+	if len(results) == 0 {
+		return fmt.Sprintf("No sheetling found matching \"%s\"", query)
+	}
+
+	return strings.Join(results, "\n\n")
 }
 
 func addTrackedUser(s *discordgo.Session, i *discordgo.InteractionCreate, query string) string {
@@ -186,27 +201,40 @@ func saveRecords(records map[string]entity.UserRecord) error {
 	return os.WriteFile(RecordsFile, data, 0644)
 }
 
-func loadLastMessageID() string {
-	data, err := os.ReadFile(LastMsgFile)
+func loadLastSheetlingMessageId(sheetlingChannelId string) string {
+	var msg entity.MessageCheckpointTable
+
+	err := db.Conn.QueryRow(context.Background(), `
+		SELECT m.channel_id, m.message_id, mt.name
+		FROM message_checkpoint m
+		JOIN message_type mt ON m.message_type = mt.id
+		WHERE m.channel_id = $1
+		ORDER BY m.channel_id
+		LIMIT 1
+	`, sheetlingChannelId).Scan(&msg.ChannelId, &msg.MessageId, &msg.MessageType)
 	if err != nil {
 		return ""
 	}
-	var t entity.Tracker
-	err = json.Unmarshal(data, &t)
-	if err != nil {
-		return ""
-	}
-	return t.LastMessageID
+
+	return msg.MessageId
 }
 
-func saveLastMessageID(id string) {
-	t := entity.Tracker{LastMessageID: id}
-	data, err := json.Marshal(t)
+func saveLastMessageId(messageId string, channelId string) string {
+	cmdTag, err := db.Conn.Exec(context.Background(), `
+		UPDATE message_checkpoint
+		SET message_id = $1
+		WHERE channel_id = $2
+	`, messageId, channelId)
+
 	if err != nil {
-		return
+		return fmt.Sprintf("Issue saving last message Id %d", err)
 	}
-	_ = os.MkdirAll(DataDir, 0755)
-	_ = os.WriteFile(LastMsgFile, data, 0644)
+
+	if cmdTag.RowsAffected() == 0 {
+		return fmt.Sprintf("No rows updated for save last message Id %s", channelId)
+	}
+
+	return ""
 }
 
 func clearCommands(s *discordgo.Session, guildID string) {
@@ -223,68 +251,4 @@ func clearCommands(s *discordgo.Session, guildID string) {
 			fmt.Println("Deleted command:", cmd.Name)
 		}
 	}
-}
-
-func deleteSheetUser(s *discordgo.Session, i *discordgo.InteractionCreate, username string) error {
-	records, err := loadRecords()
-	if err != nil {
-		return err
-	}
-
-	lowerUser := strings.ToLower(username)
-
-	// Check if user exists and delete if found
-	if _, exists := records[lowerUser]; exists {
-		delete(records, lowerUser)
-	} else {
-		msg := fmt.Sprintf("user %s not found in records", username)
-		findCensoredName(s, i, username)
-		utils.Respond(s, i, msg)
-	}
-
-	data, err := json.MarshalIndent(records, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	err = os.MkdirAll(DataDir, 0755)
-	if err != nil {
-		return err
-	}
-
-	msg := fmt.Sprintf("user %s removed from shit list", username)
-	utils.Respond(s, i, msg)
-	return os.WriteFile(RecordsFile, data, 0644)
-}
-
-func deleteTrackedUserRecord(s *discordgo.Session, i *discordgo.InteractionCreate, username string) error {
-	records, err := loadTrackedPlayers()
-	if err != nil {
-		return err
-	}
-
-	lowerUser := strings.ToLower(username)
-
-	// Check if user exists and delete if found
-	if _, exists := records[lowerUser]; exists {
-		delete(records, lowerUser)
-	} else {
-		msg := fmt.Sprintf("user %s not found in records", username)
-		findCensoredName(s, i, username)
-		utils.Respond(s, i, msg)
-	}
-
-	data, err := json.MarshalIndent(records, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	err = os.MkdirAll(DataDir, 0755)
-	if err != nil {
-		return err
-	}
-
-	msg := fmt.Sprintf("user %s removed from tracked list", username)
-	utils.Respond(s, i, msg)
-	return os.WriteFile(TrackedUserFile, data, 0644)
 }

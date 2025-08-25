@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"sheetlingTracker/db"
 	"sheetlingTracker/lol"
 	"sheetlingTracker/sheetling"
 
@@ -30,13 +31,13 @@ func main() {
 	if token == "" {
 		panic("DISCORD_BOT_TOKEN not set")
 	}
-	watchChannelID := os.Getenv("WATCH_CHANNEL_ID")
-	if watchChannelID == "" {
+	sheetlingChannelId := os.Getenv("SHEETLING_CHANNEL_ID")
+	if sheetlingChannelId == "" {
 		panic("WATCH_CHANNEL_ID not set")
 	}
 
 	guildID := os.Getenv("DISCORD_GUILD_ID")
-	if watchChannelID == "" {
+	if guildID == "" {
 		panic("GUID_ID NOT SET")
 	}
 
@@ -49,9 +50,12 @@ func main() {
 		panic(err)
 	}
 
+	db.Init()
+	defer db.Conn.Close()
+
 	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsMessageContent
 	dg.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		handleInteraction(s, i, watchChannelID, riotApiKey)
+		handleInteraction(s, i, sheetlingChannelId, riotApiKey)
 	})
 
 	err = dg.Open()
@@ -67,7 +71,7 @@ func main() {
 	select {}
 }
 
-func handleInteraction(s *discordgo.Session, i *discordgo.InteractionCreate, watchChannelID string, riotApiKey string) {
+func handleInteraction(s *discordgo.Session, i *discordgo.InteractionCreate, sheetlingChannelId string, riotApiKey string) {
 	if i.Type != discordgo.InteractionApplicationCommand {
 		return // Ignore non-command interactions
 	}
@@ -75,8 +79,8 @@ func handleInteraction(s *discordgo.Session, i *discordgo.InteractionCreate, wat
 	fmt.Printf("[DEBUG] Handling interaction: %s\n", i.ApplicationCommandData().Name)
 
 	switch i.ApplicationCommandData().Name {
-	case "update", "find", "track-user", "delete-user", "delete-tracked-user":
-		sheetling.HandleSheetlingCommands(s, i, riotApiKey, watchChannelID)
+	case "update-sheetling", "find-sheetling", "track-user":
+		sheetling.HandleSheetlingCommands(s, i, riotApiKey, sheetlingChannelId)
 	case "lol-status", "summoner", "duo-history", "find-censored":
 		lol.HandleLoLCommands(s, i, riotApiKey)
 	default:

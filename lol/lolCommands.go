@@ -115,7 +115,7 @@ func summonerLookup(s *discordgo.Session, i *discordgo.InteractionCreate, name s
 	url := fmt.Sprintf("https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/%s/NA1", name)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		utils.Respond(s, i, "Failed to create request.")
+		utils.EditResponse(s, i, "Failed to create request.")
 		return entity.Summoner{}, err
 	}
 	req.Header.Set("X-Riot-Token", riotApiKey)
@@ -123,23 +123,23 @@ func summonerLookup(s *discordgo.Session, i *discordgo.InteractionCreate, name s
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		utils.Respond(s, i, "Failed to contact Riot API.")
+		utils.EditResponse(s, i, "Failed to contact Riot API.")
 		return entity.Summoner{}, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 404 {
-		utils.Respond(s, i, fmt.Sprintf("Summoner `%s` not found.", name))
+		utils.EditResponse(s, i, fmt.Sprintf("Summoner `%s` not found.", name))
 		return entity.Summoner{}, err
 	}
 	if resp.StatusCode != 200 {
-		utils.Respond(s, i, fmt.Sprintf("Riot API error: %d", resp.StatusCode))
+		utils.EditResponse(s, i, fmt.Sprintf("Riot API error: %d", resp.StatusCode))
 		return entity.Summoner{}, err
 	}
 	var summoner entity.Summoner
 	err = json.NewDecoder(resp.Body).Decode(&summoner)
 	if err != nil {
-		utils.Respond(s, i, "Failed to decode summoner data.")
+		utils.EditResponse(s, i, "Failed to decode summoner data.")
 		return entity.Summoner{}, err
 	}
 	return summoner, err
@@ -193,7 +193,7 @@ func handleFindMatches(s *discordgo.Session, i *discordgo.InteractionCreate, puu
 	url := fmt.Sprintf("https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/%s/ids?start=0&count=30", puuid)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		utils.Respond(s, i, "Failed to create request.")
+		utils.EditResponse(s, i, "Failed to create request.")
 		return nil, err
 	}
 	req.Header.Set("X-Riot-Token", riotApiKey)
@@ -201,7 +201,7 @@ func handleFindMatches(s *discordgo.Session, i *discordgo.InteractionCreate, puu
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		utils.Respond(s, i, "Failed to contact Riot API.")
+		utils.EditResponse(s, i, "Failed to contact Riot API.")
 		return nil, err
 	}
 	defer resp.Body.Close()
@@ -220,7 +220,7 @@ func handleFindMatches(s *discordgo.Session, i *discordgo.InteractionCreate, puu
 	var matches []string
 	err = json.NewDecoder(resp.Body).Decode(&matches)
 	if err != nil {
-		utils.Respond(s, i, "Failed to decode summoner data.")
+		utils.EditResponse(s, i, "Failed to decode summoner data.")
 		fmt.Println("ERROR DECODE")
 		fmt.Println(resp.Body)
 		return nil, err
@@ -234,7 +234,7 @@ func handleFindMatchInfo(s *discordgo.Session, i *discordgo.InteractionCreate, m
 	url := fmt.Sprintf("https://americas.api.riotgames.com/lol/match/v5/matches/%s", matchID)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		utils.Respond(s, i, "Failed to create request.")
+		utils.EditResponse(s, i, "Failed to create request.")
 		return entity.MatchDto{}, err
 	}
 	req.Header.Set("X-Riot-Token", riotApiKey)
@@ -242,23 +242,23 @@ func handleFindMatchInfo(s *discordgo.Session, i *discordgo.InteractionCreate, m
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		utils.Respond(s, i, "Failed to contact Riot API.")
+		utils.EditResponse(s, i, "Failed to contact Riot API.")
 		return entity.MatchDto{}, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 404 {
-		utils.Respond(s, i, "Match not found.")
+		utils.EditResponse(s, i, "Match not found.")
 		return entity.MatchDto{}, err
 	}
 	if resp.StatusCode != 200 {
-		utils.Respond(s, i, fmt.Sprintf("Riot API error: %d", resp.StatusCode))
+		utils.EditResponse(s, i, fmt.Sprintf("Riot API error: %d", resp.StatusCode))
 		return entity.MatchDto{}, err
 	}
 	var match_info entity.MatchDto
 	err = json.NewDecoder(resp.Body).Decode(&match_info)
 	if err != nil {
-		utils.Respond(s, i, "Failed to decode summoner data.")
+		utils.EditResponse(s, i, "Failed to decode summoner data.")
 		fmt.Println(resp.Body)
 		return entity.MatchDto{}, err
 	}

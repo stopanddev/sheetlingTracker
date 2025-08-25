@@ -8,25 +8,15 @@ import (
 
 func handleUpdateSheetlings(s *discordgo.Session, i *discordgo.InteractionCreate, channelID string) {
 	msg := updateSheetlings(s, channelID)
-	utils.Respond(s, i, msg)
+	utils.EditResponse(s, i, msg)
 }
 
-func handleFindCensoredNames(s *discordgo.Session, i *discordgo.InteractionCreate, query string) {
-	msg := findCensoredName(s, i, query)
-	utils.Respond(s, i, msg)
+func handleFindSheetling(s *discordgo.Session, i *discordgo.InteractionCreate, query string) {
+	msg := findSheetling(query)
+	utils.EditResponse(s, i, msg)
 }
 
 func handleAddTrackedUser(s *discordgo.Session, i *discordgo.InteractionCreate, query string) {
 	msg := addTrackedUser(s, i, query)
-	utils.Respond(s, i, msg)
-}
-
-func handleDeleteSheetUser(s *discordgo.Session, i *discordgo.InteractionCreate, query string) {
-	msg := deleteSheetUser(s, i, query)
-	utils.Respond(s, i, msg.Error())
-}
-
-func handleDeleteTrackedUser(s *discordgo.Session, i *discordgo.InteractionCreate, query string) {
-	msg := deleteTrackedUserRecord(s, i, query)
-	utils.Respond(s, i, msg.Error())
+	utils.EditResponse(s, i, msg)
 }
