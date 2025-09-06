@@ -351,7 +351,7 @@ func addGroups(s *discordgo.Session, i *discordgo.InteractionCreate, names []str
 		args[i] = name
 	}
 
-	query := fmt.Sprintf("SELECT puuid FROM server_players WHERE player_name IN (%s)", strings.Join(placeholders, ", "))
+	query := fmt.Sprintf("SELECT puuid, player_name FROM server_players WHERE player_name IN (%s)", strings.Join(placeholders, ", "))
 
 	rows, err := db.Conn.Query(context.Background(), query, args...)
 	if err != nil {
@@ -362,14 +362,16 @@ func addGroups(s *discordgo.Session, i *discordgo.InteractionCreate, names []str
 	defer rows.Close()
 
 	var results []string
-
+	var groupName string
 	for rows.Next() {
 		var value string
-		if err := rows.Scan(&value); err != nil {
+		var name string
+		if err := rows.Scan(&value, &name); err != nil {
 			utils.EditResponse(s, i, err.Error())
 			continue
 		}
 		results = append(results, value)
+		groupName += name + ", "
 	}
 
 	if rows.Err() != nil {
@@ -386,12 +388,79 @@ func addGroups(s *discordgo.Session, i *discordgo.InteractionCreate, names []str
 
 	for _, puuid := range results {
 		batch.Queue(`
-			INSERT INTO groups (group_id, puuid)
-			VALUES ($1, $2)
-		`, groupID, puuid)
+			INSERT INTO groups (group_id, puuid, group_name)
+			VALUES ($1, $2, $3)
+		`, groupID, puuid, groupName)
 	}
 
 	br := db.Conn.SendBatch(ctx, batch)
 	defer br.Close()
 	utils.EditResponse(s, i, "Group Added")
+}
+
+func getGroups(s *discordgo.Session, i *discordgo.InteractionCreate, name string, riotApiKey string) {
+	rows, err := db.Conn.Query(context.Background(), "SELECT puuid from groups WHERE group_name = $1", name)
+
+	if err != nil {
+		utils.EditResponse(s, i, err.Error())
+		return
+	}
+	defer rows.Close()
+	var puuids []string
+	for rows.Next() {
+		var puuid string
+		if err = rows.Scan(&puuid); err != nil {
+			utils.EditResponse(s, i, err.Error())
+			return
+		}
+
+		puuids = append(puuids, puuid)
+	}
+	count := len(puuids)
+
+	placeholders := make([]string, count)
+	args := make([]interface{}, count)
+	for i, id := range puuids {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = id
+	}
+
+	query := fmt.Sprintf(`
+		SELECT COUNT(*)
+		FROM (
+			SELECT match_id
+			FROM match_player_details
+			WHERE puuid IN (%s) AND win = true
+			GROUP BY match_id
+			HAVING COUNT(DISTINCT puuid) = %d
+		) as wins;
+	`, strings.Join(placeholders, ", "), count)
+
+	var winCount int
+	err = db.Conn.QueryRow(context.Background(), query, args...).Scan(&winCount)
+	if err != nil {
+		utils.EditResponse(s, i, err.Error())
+		return
+	}
+
+	query = fmt.Sprintf(`
+			SELECT COUNT(*)
+			FROM (
+				SELECT match_id
+				FROM match_player_details
+				WHERE puuid IN (%s) AND win = false
+				GROUP BY match_id
+				HAVING COUNT(DISTINCT puuid) = %d
+			) as losses;
+		`, strings.Join(placeholders, ", "), count)
+
+	var lossCount int
+	err = db.Conn.QueryRow(context.Background(), query, args...).Scan(&lossCount)
+	if err != nil {
+		utils.EditResponse(s, i, err.Error())
+		return
+	}
+
+	msg := fmt.Sprintf("%s has: %d wins and %d losses", name, winCount, lossCount)
+	utils.EditResponse(s, i, msg)
 }

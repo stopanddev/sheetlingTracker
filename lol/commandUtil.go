@@ -49,6 +49,15 @@ func RegisterLoLCommands(s *discordgo.Session, guildID string) error {
 		return err
 	}
 
+	_, err = s.ApplicationCommandCreate(s.State.User.ID, guildID, &discordgo.ApplicationCommand{
+		Name:        "group-stats",
+		Description: "Get player group",
+	})
+
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -68,5 +77,7 @@ func HandleLoLDropdowns(s *discordgo.Session, i *discordgo.InteractionCreate, ri
 		handleAddMyMatchesDropdown(s, i)
 	case "add-group":
 		handleAddGroupDopdown(s, i)
+	case "group-stats":
+		handleGetGroupStats(s, i)
 	}
 }

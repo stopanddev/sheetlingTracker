@@ -46,7 +46,7 @@ func updateSheetlings(s *discordgo.Session, channelId string) string {
 		}
 		batchRequest := db.Conn.SendBatch(context.Background(), batch)
 		defer batchRequest.Close()
-
+		fmt.Println(records)
 		for range records {
 			if _, err := batchRequest.Exec(); err != nil {
 				return "Error inserting shitling update"

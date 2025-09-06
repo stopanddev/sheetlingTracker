@@ -67,6 +67,9 @@ func handleInteraction(s *discordgo.Session, i *discordgo.InteractionCreate, she
 		case "add_group":
 			groupMembers := i.MessageComponentData().Values
 			lol.HanleAddGroup(s, i, groupMembers, riotApiKey)
+		case "get_group":
+			groupName := i.MessageComponentData().Values[0]
+			lol.HandleGetGroup(s, i, groupName, riotApiKey)
 		}
 	} else {
 		switch i.ApplicationCommandData().Name {
@@ -74,7 +77,7 @@ func handleInteraction(s *discordgo.Session, i *discordgo.InteractionCreate, she
 			sheetling.HandleSheetlingCommands(s, i, riotApiKey, sheetlingChannelId)
 		case "add-summoner":
 			lol.HandleLoLCommands(s, i, riotApiKey)
-		case "add-my-matches", "add-group":
+		case "add-my-matches", "add-group", "group-stats":
 			lol.HandleLoLDropdowns(s, i, riotApiKey)
 		default:
 			fmt.Printf("[DEBUG] Unknown command: %s\n", i.ApplicationCommandData().Name)

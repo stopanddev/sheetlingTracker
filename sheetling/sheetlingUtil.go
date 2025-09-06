@@ -8,14 +8,6 @@ import (
 
 func SheetlingRegisterCommands(s *discordgo.Session, guildID string) {
 	_, err := s.ApplicationCommandCreate(s.State.User.ID, guildID, &discordgo.ApplicationCommand{
-		Name:        "update",
-		Description: "Scan channel and update user records",
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	_, err = s.ApplicationCommandCreate(s.State.User.ID, guildID, &discordgo.ApplicationCommand{
 		Name:        "find-sheetling",
 		Description: "Find a user in the records",
 		Options: []*discordgo.ApplicationCommandOption{
@@ -32,16 +24,8 @@ func SheetlingRegisterCommands(s *discordgo.Session, guildID string) {
 	}
 
 	_, err = s.ApplicationCommandCreate(s.State.User.ID, guildID, &discordgo.ApplicationCommand{
-		Name:        "track-user",
+		Name:        "update-sheetling",
 		Description: "Track your games to spot shitling ",
-		Options: []*discordgo.ApplicationCommandOption{
-			{
-				Type:        discordgo.ApplicationCommandOptionString,
-				Name:        "query",
-				Description: "Username to add",
-				Required:    true,
-			},
-		},
 	})
 	if err != nil {
 		panic(err)
