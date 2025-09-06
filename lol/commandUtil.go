@@ -34,14 +34,6 @@ func RegisterLoLCommands(s *discordgo.Session, guildID string) error {
 	_, err = s.ApplicationCommandCreate(s.State.User.ID, guildID, &discordgo.ApplicationCommand{
 		Name:        "add-my-matches",
 		Description: "Lookup summoner info by name",
-		Options: []*discordgo.ApplicationCommandOption{
-			{
-				Type:        discordgo.ApplicationCommandOptionString,
-				Name:        "name",
-				Description: "Summoner name",
-				Required:    true,
-			},
-		},
 	})
 
 	if err != nil {
@@ -58,9 +50,13 @@ func HandleLoLCommands(s *discordgo.Session, i *discordgo.InteractionCreate, rio
 		name := i.ApplicationCommandData().Options[0].StringValue()
 		tagLine := i.ApplicationCommandData().Options[1].StringValue()
 		handleAddSummoner(s, i, name, tagLine, riotApiKey)
+	}
+}
+
+func HandleLoLDropdowns(s *discordgo.Session, i *discordgo.InteractionCreate, riotApiKey string) {
+	switch i.ApplicationCommandData().Name {
 	case "add-my-matches":
-		name := i.ApplicationCommandData().Options[0].StringValue()
-		hanleAddMatches(s, i, name, riotApiKey)
+		handleAddMyMatchesDropdown(s, i)
 	}
 }
 

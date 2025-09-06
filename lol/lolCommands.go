@@ -61,7 +61,7 @@ func summonerLookup(s *discordgo.Session, i *discordgo.InteractionCreate, name s
 		WHERE p.player_name = $1
 		ORDER BY p.player_name
 		LIMIT 1
-	`, name).Scan(&summoner.GameName, &summoner.Puuid, &summoner.TagLine)
+	`, name).Scan(&summoner.GameName, &summoner.TagLine, &summoner.Puuid)
 	if err != nil {
 		utils.EditResponse(s, i, err.Error())
 		return entity.Summoner{}, err
@@ -84,7 +84,7 @@ func insertSummoner(s *discordgo.Session, i *discordgo.InteractionCreate, name s
 			player_name, tag_line, puuid
 		)
 		VALUES ($1, $2, $3)
-		ON CONFLICT (match_id) DO NOTHING;
+		ON CONFLICT (player_name, tag_line) DO NOTHING;
 	`
 
 	_, err = db.Conn.Exec(ctx, query, summoner.GameName, summoner.TagLine, summoner.Puuid)
@@ -92,6 +92,8 @@ func insertSummoner(s *discordgo.Session, i *discordgo.InteractionCreate, name s
 		utils.EditResponse(s, i, err.Error())
 		return
 	}
+
+	utils.EditResponse(s, i, fmt.Sprintf("Successfully added %s", name))
 
 }
 func getMatchIds(s *discordgo.Session, i *discordgo.InteractionCreate, puuid string, riotApiKey string) ([]string, error) {
@@ -102,7 +104,6 @@ func getMatchIds(s *discordgo.Session, i *discordgo.InteractionCreate, puuid str
 		return []string{}, err
 	}
 	req.Header.Set("X-Riot-Token", riotApiKey)
-
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -114,7 +115,6 @@ func getMatchIds(s *discordgo.Session, i *discordgo.InteractionCreate, puuid str
 		utils.Respond(s, i)
 		return []string{}, err
 	}
-
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return []string{}, err
@@ -170,23 +170,24 @@ func getMatches(s *discordgo.Session, i *discordgo.InteractionCreate, puuId stri
 	matchIds, err := getMatchIds(s, i, puuId, riotApiKey)
 	var matchList []entity.MatchDto
 	if err != nil {
+		utils.EditResponse(s, i, err.Error())
 		return
 	}
-
 	for _, matchId := range matchIds {
 		match, err := getSingleMatch(s, i, matchId, riotApiKey)
 		if err != nil {
+			utils.EditResponse(s, i, err.Error())
 			return
 		}
-
 		matchList = append(matchList, match)
 	}
-
 	var validMatches = filterMatches(matchList)
 	for _, match := range validMatches {
 		matchRecord, matchDetails := entityUtils.ParseMatchDto(match)
 		insertMatches(s, i, matchRecord, matchDetails)
 	}
+
+	utils.EditResponse(s, i, "Finished adding records")
 
 }
 

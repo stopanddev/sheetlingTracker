@@ -72,18 +72,24 @@ func main() {
 }
 
 func handleInteraction(s *discordgo.Session, i *discordgo.InteractionCreate, sheetlingChannelId string, riotApiKey string) {
-	if i.Type != discordgo.InteractionApplicationCommand {
-		return // Ignore non-command interactions
-	}
+	if i.Type == discordgo.InteractionMessageComponent {
+		switch i.MessageComponentData().CustomID {
+		case "add_summoner_matches":
+			selectedName := i.MessageComponentData().Values[0]
+			lol.HanleAddMatches(s, i, selectedName, riotApiKey)
+		}
+	} else {
+		fmt.Printf("[DEBUG] Handling interaction: %s\n", i.ApplicationCommandData().Name)
 
-	fmt.Printf("[DEBUG] Handling interaction: %s\n", i.ApplicationCommandData().Name)
-
-	switch i.ApplicationCommandData().Name {
-	case "update-sheetling", "find-sheetling":
-		sheetling.HandleSheetlingCommands(s, i, riotApiKey, sheetlingChannelId)
-	case "summoner", "add-my-matches":
-		lol.HandleLoLCommands(s, i, riotApiKey)
-	default:
-		fmt.Printf("[DEBUG] Unknown command: %s\n", i.ApplicationCommandData().Name)
+		switch i.ApplicationCommandData().Name {
+		case "update-sheetling", "find-sheetling":
+			sheetling.HandleSheetlingCommands(s, i, riotApiKey, sheetlingChannelId)
+		case "add-summoner":
+			lol.HandleLoLCommands(s, i, riotApiKey)
+		case "add-my-matches":
+			lol.HandleLoLDropdowns(s, i, riotApiKey)
+		default:
+			fmt.Printf("[DEBUG] Unknown command: %s\n", i.ApplicationCommandData().Name)
+		}
 	}
 }
