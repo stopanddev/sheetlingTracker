@@ -11,19 +11,6 @@ import (
 	"github.com/joho/godotenv"
 )
 
-type UserRecord struct {
-	User   string `json:"user"`
-	Reason string `json:"reason"`
-}
-
-type User struct {
-	User string `jsong:"user"`
-}
-
-type Tracker struct {
-	LastMessageID string `json:"last_message_id"`
-}
-
 func main() {
 	_ = godotenv.Load()
 
@@ -77,16 +64,17 @@ func handleInteraction(s *discordgo.Session, i *discordgo.InteractionCreate, she
 		case "add_summoner_matches":
 			selectedName := i.MessageComponentData().Values[0]
 			lol.HanleAddMatches(s, i, selectedName, riotApiKey)
+		case "add_group":
+			groupMembers := i.MessageComponentData().Values
+			lol.HanleAddGroup(s, i, groupMembers, riotApiKey)
 		}
 	} else {
-		fmt.Printf("[DEBUG] Handling interaction: %s\n", i.ApplicationCommandData().Name)
-
 		switch i.ApplicationCommandData().Name {
 		case "update-sheetling", "find-sheetling":
 			sheetling.HandleSheetlingCommands(s, i, riotApiKey, sheetlingChannelId)
 		case "add-summoner":
 			lol.HandleLoLCommands(s, i, riotApiKey)
-		case "add-my-matches":
+		case "add-my-matches", "add-group":
 			lol.HandleLoLDropdowns(s, i, riotApiKey)
 		default:
 			fmt.Printf("[DEBUG] Unknown command: %s\n", i.ApplicationCommandData().Name)

@@ -42,7 +42,6 @@ func updateSheetlings(s *discordgo.Session, channelId string) string {
 		batch := &pgx.Batch{}
 
 		for _, record := range records {
-			fmt.Println(record.User, record.Reason)
 			batch.Queue("INSERT INTO sheetlings (name, reason) VALUES ($1, $2)", record.User, record.Reason)
 		}
 		batchRequest := db.Conn.SendBatch(context.Background(), batch)
@@ -151,20 +150,4 @@ func saveLastMessageId(messageId string, channelId string) string {
 	}
 
 	return ""
-}
-
-func clearCommands(s *discordgo.Session, guildID string) {
-	cmds, err := s.ApplicationCommands(s.State.User.ID, guildID)
-	if err != nil {
-		fmt.Println("Failed to fetch commands:", err)
-		return
-	}
-	for _, cmd := range cmds {
-		err := s.ApplicationCommandDelete(s.State.User.ID, guildID, cmd.ID)
-		if err != nil {
-			fmt.Printf("Failed to delete command %s: %v\n", cmd.Name, err)
-		} else {
-			fmt.Println("Deleted command:", cmd.Name)
-		}
-	}
 }

@@ -129,8 +129,6 @@ func getMatchIds(s *discordgo.Session, i *discordgo.InteractionCreate, puuid str
 
 func getSingleMatch(s *discordgo.Session, i *discordgo.InteractionCreate, matchId string, riotApiKey string) (entity.MatchDto, error) {
 	url := fmt.Sprintf("https://americas.api.riotgames.com/lol/match/v5/matches/%s", matchId)
-	fmt.Println("MATCH ID")
-	fmt.Println(matchId)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		utils.EditResponse(s, i, err.Error())
@@ -163,7 +161,6 @@ func getSingleMatch(s *discordgo.Session, i *discordgo.InteractionCreate, matchI
 	}
 
 	return result, nil
-
 }
 
 func getMatches(s *discordgo.Session, i *discordgo.InteractionCreate, puuId string, riotApiKey string) {
@@ -343,4 +340,58 @@ func insertMatches(s *discordgo.Session, i *discordgo.InteractionCreate, matchRe
 	}
 
 	utils.EditResponse(s, i, "Matches added")
+}
+
+func addGroups(s *discordgo.Session, i *discordgo.InteractionCreate, names []string, riotApiKey string) {
+	placeholders := make([]string, len(names))
+	args := make([]interface{}, len(names))
+	ctx := context.Background()
+	for i, name := range names {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = name
+	}
+
+	query := fmt.Sprintf("SELECT puuid FROM server_players WHERE player_name IN (%s)", strings.Join(placeholders, ", "))
+
+	rows, err := db.Conn.Query(context.Background(), query, args...)
+	if err != nil {
+		utils.EditResponse(s, i, err.Error())
+		return
+	}
+
+	defer rows.Close()
+
+	var results []string
+
+	for rows.Next() {
+		var value string
+		if err := rows.Scan(&value); err != nil {
+			utils.EditResponse(s, i, err.Error())
+			continue
+		}
+		results = append(results, value)
+	}
+
+	if rows.Err() != nil {
+		utils.EditResponse(s, i, rows.Err().Error())
+	}
+
+	var groupID int
+	err = db.Conn.QueryRow(ctx, "SELECT nextval('group_id_seq')").Scan(&groupID)
+	if err != nil {
+		utils.EditResponse(s, i, err.Error())
+	}
+
+	batch := &pgx.Batch{}
+
+	for _, puuid := range results {
+		batch.Queue(`
+			INSERT INTO groups (group_id, puuid)
+			VALUES ($1, $2)
+		`, groupID, puuid)
+	}
+
+	br := db.Conn.SendBatch(ctx, batch)
+	defer br.Close()
+	utils.EditResponse(s, i, "Group Added")
 }
