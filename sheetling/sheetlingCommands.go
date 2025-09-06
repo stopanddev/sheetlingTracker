@@ -2,9 +2,7 @@ package sheetling
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
 	"sheetlingTracker/db"
 	"sheetlingTracker/entity"
 	"strings"
@@ -12,11 +10,6 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/jackc/pgx/v4"
 )
-
-var DataDir = "data"
-var RecordsFile = DataDir + "/records.json"
-var LastMsgFile = DataDir + "/last_message.json"
-var TrackedUserFile = DataDir + "/tracked_users.json"
 
 func updateSheetlings(s *discordgo.Session, channelId string) string {
 
@@ -108,31 +101,6 @@ func findSheetling(query string) string {
 	return strings.Join(results, "\n\n")
 }
 
-func addTrackedUser(s *discordgo.Session, i *discordgo.InteractionCreate, query string) string {
-	records, err := loadTrackedPlayers()
-	if err != nil {
-		return "Failed to get or create tracked players file."
-	}
-	exists := false
-	for _, record := range records {
-		if strings.EqualFold(strings.ToLower(query), strings.ToLower(record.User)) {
-			exists = true
-		}
-	}
-
-	if exists {
-		return "User already followed"
-	}
-	lowerQuery := strings.ToLower(query)
-	records[lowerQuery] = entity.User{User: lowerQuery}
-	err = saveTrackedUser(records)
-	if err != nil {
-		return "Failed To Add Player"
-	}
-
-	return "User Added"
-}
-
 // Utility functions
 
 func extractUserReason(content string) (string, string) {
@@ -147,56 +115,6 @@ func extractUserReason(content string) (string, string) {
 		}
 	}
 	return user, reason
-}
-
-func loadRecords() (map[string]entity.UserRecord, error) {
-	records := make(map[string]entity.UserRecord)
-	data, err := os.ReadFile(RecordsFile)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return records, nil // no file yet, return empty map
-		}
-		return nil, err
-	}
-	err = json.Unmarshal(data, &records)
-	return records, err
-}
-
-func loadTrackedPlayers() (map[string]entity.User, error) {
-	records := make(map[string]entity.User)
-	data, err := os.ReadFile(TrackedUserFile)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return records, nil // no file yet, return empty map
-		}
-		return nil, err
-	}
-	err = json.Unmarshal(data, &records)
-	return records, err
-}
-
-func saveTrackedUser(records map[string]entity.User) error {
-	data, err := json.MarshalIndent(records, "", "  ")
-	if err != nil {
-		return err
-	}
-	err = os.MkdirAll(DataDir, 0755)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(TrackedUserFile, data, 0644)
-}
-
-func saveRecords(records map[string]entity.UserRecord) error {
-	data, err := json.MarshalIndent(records, "", "  ")
-	if err != nil {
-		return err
-	}
-	err = os.MkdirAll(DataDir, 0755)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(RecordsFile, data, 0644)
 }
 
 func loadLastSheetlingMessageId(sheetlingChannelId string) string {

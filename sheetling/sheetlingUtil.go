@@ -60,8 +60,5 @@ func HandleSheetlingCommands(s *discordgo.Session, i *discordgo.InteractionCreat
 	case "find-sheetling":
 		query := i.ApplicationCommandData().Options[0].StringValue()
 		handleFindSheetling(s, i, query)
-	case "track-user":
-		query := i.ApplicationCommandData().Options[0].StringValue()
-		handleAddTrackedUser(s, i, query)
 	}
 }

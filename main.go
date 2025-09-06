@@ -79,9 +79,9 @@ func handleInteraction(s *discordgo.Session, i *discordgo.InteractionCreate, she
 	fmt.Printf("[DEBUG] Handling interaction: %s\n", i.ApplicationCommandData().Name)
 
 	switch i.ApplicationCommandData().Name {
-	case "update-sheetling", "find-sheetling", "track-user":
+	case "update-sheetling", "find-sheetling":
 		sheetling.HandleSheetlingCommands(s, i, riotApiKey, sheetlingChannelId)
-	case "lol-status", "summoner", "duo-history", "find-censored":
+	case "summoner", "add-my-matches":
 		lol.HandleLoLCommands(s, i, riotApiKey)
 	default:
 		fmt.Printf("[DEBUG] Unknown command: %s\n", i.ApplicationCommandData().Name)

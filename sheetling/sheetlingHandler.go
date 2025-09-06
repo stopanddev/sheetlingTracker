@@ -17,9 +17,3 @@ func handleFindSheetling(s *discordgo.Session, i *discordgo.InteractionCreate, q
 	msg := findSheetling(query)
 	utils.EditResponse(s, i, msg)
 }
-
-func handleAddTrackedUser(s *discordgo.Session, i *discordgo.InteractionCreate, query string) {
-	utils.Respond(s, i)
-	msg := addTrackedUser(s, i, query)
-	utils.EditResponse(s, i, msg)
-}
